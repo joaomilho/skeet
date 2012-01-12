@@ -9,4 +9,4 @@ use Rack::Head
 use Rack::ConditionalGet
 use Rack::Deflater
 use Rack::Chunked
-run Skeet
+run MaileeShots

@@ -1,53 +1,31 @@
 require 'magick/crop_resized'
-require 'base64'
-require 'digest/md5'
 
-class Skeet < Sinatra::Base
+class MaileeShots < Sinatra::Base
   configure do
     IMGKit.configure do |config|
       config.wkhtmltoimage = File.join(File.dirname(__FILE__), 'bin', 'wkhtmltoimage-amd64')
-      # config.wkhtmltoimage = File.join(File.dirname(__FILE__), 'bin', 'wkhtmltoimage')
-      config.default_options = { quality: 100 }
+      config.default_options = { quality: 75 }
     end
-    
-    set :cache, Dalli::Client.new
   end
-  
-  get '/cache-stats' do
-    settings.cache.stats.to_s
-  end
-  
-  get '/*' do
-    expires 1600, :public, :proxy_revalidate
-    halt unless valid_uri?(params[:splat].join)
+
+  # "mailee-shots.heroku.com/softa/template/9658" 
+  URL = "http://%s.mailee.me/clients/%s/%s_%s.html" 
+  get '/:client/:klass/:id' do
+    # Request must come from Mailee's ip.
+    # halt unless request.ip == '74.86.147.210'
+    # expires 1600, :public, :proxy_revalidate
+    client, klass, id = [params[:client], params[:klass], params[:id]]
+    url = URL % [client, client, klass, id]
 
     headers({
       'Content-Disposition' => 'inline',
       'Content-Type' => 'image/jpeg'
     })
-    
-    cached_image = settings.cache.get(cache_key)
-    
-    if cached_image
-      image = Base64.decode64(cached_image)
-    else
-      image = IMGKit.new(params[:splat].join).to_img
-      resize = Magick::Image.from_blob(image).first.crop_resized!(300, 300, Magick::NorthWestGravity)
-      
-      image = resize.to_blob
-      
-      settings.cache.set(cache_key, Base64.encode64(image))
-    end
 
+    image = IMGKit.new(url).to_img
+    resize = Magick::Image.from_blob(image).first.crop_resized!(300, 300)
+    image = resize.to_blob
     image
   end
-  
-  private
-  def cache_key
-    Digest::MD5.hexdigest(params[:splat].join)
-  end
-  
-  def valid_uri?(uri)
-    uri.match(/(^$)|(^(http|https):\/\/[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,5}(([0-9]{1,5})?\/.*)?$)/ix)
-  end
+
 end
